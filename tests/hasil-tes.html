@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hasil Uji — qris-dinamis</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel-2: #1d212c; --border: #2a2f3d;
+    --text: #e6e9f0; --muted: #8b93a7; --ok: #3ddc97; --ok-dim: #1c4a37;
+    --fail: #ff5c7a; --fail-dim: #4d1f2b; --accent: #5b8cff;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 20px 64px; background: var(--bg); color: var(--text);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .sub code { font-family: var(--mono); color: var(--accent); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .card .v { font-size: 24px; font-weight: 650; font-family: var(--mono); margin-top: 2px; }
+
+  .banner {
+    display: none; padding: 14px 18px; border-radius: 10px; margin-bottom: 24px;
+    border: 1px solid var(--ok-dim); background: #12261e; color: #b7f5d8;
+  }
+  .banner.show { display: block; }
+  .banner.bad { border-color: var(--fail-dim); background: #2a1419; color: #ffc4d0; }
+
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+  section > h2 {
+    margin: 0; padding: 14px 18px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--muted); background: var(--panel-2);
+    border-bottom: 1px solid var(--border); font-weight: 600;
+  }
+  .body { padding: 16px 18px; }
+
+  ul.tests { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 13px; }
+  ul.tests li { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #20242f; align-items: flex-start; }
+  ul.tests li:last-child { border-bottom: 0; }
+  .dot { flex: 0 0 auto; font-weight: 700; }
+  .dot.p { color: var(--ok); }
+  .dot.f { color: var(--fail); }
+  .tname { flex: 1; }
+  li.badrow .tname { color: #ffb3c1; }
+  .err { display: block; color: var(--fail); white-space: pre-wrap; font-size: 12px; margin-top: 3px; }
+  .ms { color: var(--muted); font-size: 11px; flex: 0 0 auto; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .qrbox { text-align: center; }
+  .qrbox img { width: 100%; max-width: 300px; image-rendering: pixelated; background: #fff; padding: 8px; border-radius: 8px; }
+  .payload {
+    font-family: var(--mono); font-size: 12px; word-break: break-all;
+    background: #0b0d13; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; color: #9fb0d0; margin-top: 8px; max-height: 130px; overflow: auto; text-align: left;
+  }
+  .payload b { color: var(--accent); font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-family: var(--mono); }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid #20242f; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  td.tag { color: var(--accent); font-weight: 600; width: 44px; }
+  td.val { word-break: break-all; color: #c3cbd9; }
+  tr.changed td { background: #1a2130; }
+  tr.changed td.val { color: #fff; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); margin-left: 6px; }
+  .pill.new { border-color: var(--ok-dim); color: var(--ok); }
+  .pill.mod { border-color: #4a3f1f; color: #e5c07b; }
+
+  form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 4px; }
+  input, select {
+    background: #0b0d13; border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 8px 10px; font-family: var(--mono); font-size: 13px;
+  }
+  input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 7px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: .5; cursor: default; }
+  .errmsg { color: var(--fail); font-size: 13px; margin-top: 10px; font-family: var(--mono); }
+  footer { color: var(--muted); font-size: 12px; margin-top: 28px; line-height: 1.8; }
+  footer code { font-family: var(--mono); color: #a9b4c9; }
+</style>
+</head>
+<div class="wrap">
+  <h1>Hasil Uji — qris-dinamis</h1>
+  <div class="sub">Dijalankan langsung di server lokal: <code>php tests/run.php</code> · hasil selalu aktual, bukan tangkapan layar.</div>
+
+  <div class="cards">
+    <div class="card"><div class="k">Status</div><div class="v" id="cStatus">…</div></div>
+    <div class="card"><div class="k">Total tes</div><div class="v" id="cTotal">…</div></div>
+    <div class="card"><div class="k">Lulus</div><div class="v" id="cPass" style="color:var(--ok)">…</div></div>
+    <div class="card"><div class="k">Gagal</div><div class="v" id="cFail" style="color:var(--fail)">…</div></div>
+    <div class="card"><div class="k">PHP</div><div class="v" id="cPhp" style="font-size:16px">…</div></div>
+    <div class="card"><div class="k">GD</div><div class="v" id="cGd" style="font-size:16px">…</div></div>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <section>
+    <h2>Daftar Tes</h2>
+    <div class="body"><ul class="tests" id="list"><li>Memuat…</li></ul></div>
+  </section>
+
+  <section>
+    <h2>Coba Konversi — Statis ke Dinamis</h2>
+    <div class="body">
+      <form id="form">
+        <div><label for="amount">Nominal</label><input id="amount" value="25000" size="12"></div>
+        <div><label for="format">Format</label>
+          <select id="format">
+            <option value="auto">auto</option>
+            <option value="integer">integer</option>
+            <option value="decimal">decimal</option>
+          </select>
+        </div>
+        <div><label for="scale">Skala QR</label>
+          <select id="scale">
+            <option value="4">4</option><option value="6">6</option>
+            <option value="8" selected>8</option><option value="12">12</option>
+            <option value="16">16</option>
+          </select>
+        </div>
+        <button type="submit" id="go">Konversi</button>
+      </form>
+      <div class="errmsg" id="errmsg"></div>
+
+      <div class="grid2" style="margin-top:18px">
+        <div class="qrbox">
+          <img id="qr" alt="QR hasil konversi">
+          <div class="payload" id="dynamicPayload">—</div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Perubahan TLV</div>
+          <table>
+            <thead><tr><th>Tag</th><th>Nilai</th></tr></thead>
+            <tbody id="tags"><tr><td colspan="2" style="color:var(--muted)">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function loadTests() {
+  try {
+    const res = await fetch('runner_json.php', { cache: 'no-store' });
+    const d = await res.json();
+
+    $('cTotal').textContent = d.total;
+    $('cPass').textContent = d.passed;
+    $('cFail').textContent = d.failed;
+    $('cPhp').textContent = d.php;
+    $('cGd').textContent = d.gd ? 'aktif' : 'mati';
+    $('cGd').style.color = d.gd ? 'var(--ok)' : 'var(--fail)';
+    $('cStatus').textContent = d.failed === 0 ? 'LULUS' : 'GAGAL';
+    $('cStatus').style.color = d.failed === 0 ? 'var(--ok)' : 'var(--fail)';
+    $('cStatus').style.fontSize = '16px';
+
+    const b = $('banner');
+    b.className = 'banner show' + (d.failed === 0 ? '' : ' bad');
+    b.textContent = d.failed === 0
+      ? `Semua ${d.total} tes lulus. Exit code 0. Total ${d.durationMs} ms.`
+      : `${d.failed} dari ${d.total} tes gagal. Exit code 1.`;
+
+    $('list').innerHTML = d.results.map((r) => `
+      <li class="${r.ok ? '' : 'badrow'}">
+        <span class="dot ${r.ok ? 'p' : 'f'}">${r.ok ? '✓' : '✗'}</span>
+        <span class="tname">${esc(r.name)}${r.ok ? '' : `<span class="err">${esc(r.message)}</span>`}</span>
+        <span class="ms">${r.ms} ms</span>
+      </li>`).join('');
+  } catch (e) {
+    $('list').innerHTML = `<li><span class="dot f">✗</span><span class="tname">Gagal memuat hasil tes: ${esc(e.message)}</span></li>`;
+  }
+}
+
+function renderTags(st, dy) {
+  const old = new Map(st.map((t) => [t.tag, t.value]));
+  $('tags').innerHTML = dy.map((t) => {
+    const before = old.get(t.tag);
+    let pill = '';
+    let cls = '';
+    if (before === undefined) { pill = '<span class="pill new">baru</span>'; cls = 'changed'; }
+    else if (before !== t.value) { pill = '<span class="pill mod">diubah</span>'; cls = 'changed'; }
+    return `<tr class="${cls}"><td class="tag">${esc(t.tag)}${pill}</td><td class="val">${esc(t.value)}</td></tr>`;
+  }).join('');
+}
+
+async function convert() {
+  const btn = $('go');
+  btn.disabled = true;
+  $('errmsg').textContent = '';
+  const params = new URLSearchParams({
+    amount: $('amount').value.trim(),
+    format: $('format').value,
+  });
+  try {
+    const res = await fetch('api.php?' + params, { cache: 'no-store' });
+    const d = await res.json();
+    if (!res.ok || !d.ok) {
+      $('errmsg').textContent = `[${d.code}] ${d.message}`;
+      $('qr').removeAttribute('src');
+      $('dynamicPayload').textContent = '—';
+      $('tags').innerHTML = '<tr><td colspan="2" style="color:var(--muted)">—</td></tr>';
+      return;
+    }
+    $('dynamicPayload').innerHTML = `<b>${d.length.dynamic} byte</b> · ` + esc(d.dynamic);
+    renderTags(d.staticTags, d.dynamicTags);
+
+    const png = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'png', text: d.dynamic, ecc: 'M', scale: Number($('scale').value) }),
+    });
+    if (!png.ok) {
+      const e = await png.json();
+      $('errmsg').textContent = `[${e.code}] ${e.message}`;
+      $('qr').removeAttribute('src');
+      return;
+    }
+    const blob = await png.blob();
+    $('qr').src = URL.createObjectURL(blob);
+  } catch (e) {
+    $('errmsg').textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('form').addEventListener('submit', (ev) => { ev.preventDefault(); convert(); });
+$('scale').addEventListener('change', convert);
+loadTests();
+convert();
+</script>
+</body>
+</html>

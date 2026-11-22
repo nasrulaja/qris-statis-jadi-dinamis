@@ -1,0 +1,21 @@
+{
+    "name": "local/qris-dinamis",
+    "description": "Ubah payload QRIS statis (EMVCo TLV) menjadi QRIS dinamis dengan nominal tertentu, lengkap dengan CRC16 dan gambar QR PNG.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1"
+    },
+    "suggest": {
+        "ext-gd": "Dibutuhkan untuk membuat gambar QR dalam format PNG"
+    },
+    "autoload": {
+        "psr-4": {
+            "QrisDinamis\\": "src/"
+        }
+    },
+    "bin": ["bin/qris"],
+    "scripts": {
+        "test": "php tests/run.php"
+    }
+}

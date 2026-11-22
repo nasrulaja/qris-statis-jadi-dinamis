@@ -1,0 +1,121 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/../src/autoload.php';
+
+use QrisDinamis\QrCode\PngRenderer;
+use QrisDinamis\QrisConverter;
+use QrisDinamis\QrisException;
+
+const USAGE = <<<'TXT'
+Pemakaian:
+  php bin/qris --amount NOMINAL (--qris "STRING" | --file PATH | < stdin) [opsi]
+
+Opsi:
+  -a, --amount NOMINAL    Nominal rupiah, mis. 25000 atau 1500.50   (wajib)
+  -q, --qris STRING       String QRIS statis
+  -f, --file PATH         Baca string QRIS statis dari file teks
+  -o, --png PATH          Simpan gambar QR dinamis ke file PNG
+      --format MODE       Format nominal Tag 54: auto (default) | integer | decimal
+      --scale N           Piksel per modul PNG (default 8)
+      --ecc LEVEL         Level koreksi error QR: L | M (default) | Q | H
+      --no-verify-crc     Jangan cek CRC input (tidak disarankan)
+      --allow-dynamic     Izinkan input yang sudah dinamis (nominal lama diganti)
+  -h, --help              Tampilkan bantuan ini
+
+Keluaran: string QRIS dinamis di stdout. Pesan error ke stderr (exit code 1).
+
+Contoh:
+  php bin/qris -a 25000 -q "000201010211..."
+  php bin/qris -a 25000 -f qris-statis.txt -o qris-25000.png
+  cat qris-statis.txt | php bin/qris -a 1500.50 --format decimal
+
+TXT;
+
+function fail(string $message, int $code = 1): never
+{
+    fwrite(STDERR, "Error: {$message}\n");
+    exit($code);
+}
+
+/** @param array<string, mixed> $opts */
+function opt(array $opts, string ...$names): ?string
+{
+    foreach ($names as $name) {
+        if (isset($opts[$name])) {
+            $v = $opts[$name];
+            return is_array($v) ? (string) end($v) : (string) $v;
+        }
+    }
+    return null;
+}
+
+/** @param array<string, mixed> $opts */
+function flag(array $opts, string $name): bool
+{
+    return array_key_exists($name, $opts);
+}
+
+$opts = getopt('a:q:f:o:h', [
+    'amount:', 'qris:', 'file:', 'png:', 'format:', 'scale:', 'ecc:',
+    'no-verify-crc', 'allow-dynamic', 'help',
+]);
+
+if ($opts === false || flag($opts, 'h') || flag($opts, 'help')) {
+    echo USAGE;
+    exit($opts === false ? 2 : 0);
+}
+
+$amount = opt($opts, 'a', 'amount');
+if ($amount === null) {
+    fwrite(STDERR, "Error: nominal wajib diisi (--amount).\n\n" . USAGE);
+    exit(2);
+}
+
+$qris = opt($opts, 'q', 'qris');
+if ($qris === null) {
+    $file = opt($opts, 'f', 'file');
+    if ($file !== null) {
+        if (!is_file($file) || !is_readable($file)) {
+            fail("File \"{$file}\" tidak ditemukan atau tidak bisa dibaca.");
+        }
+        $qris = (string) file_get_contents($file);
+    } elseif (!stream_isatty(STDIN)) {
+        $qris = (string) stream_get_contents(STDIN);
+    } else {
+        fwrite(STDERR, "Error: string QRIS statis belum diberikan (--qris, --file, atau lewat stdin).\n\n" . USAGE);
+        exit(2);
+    }
+}
+
+$scaleOpt = opt($opts, 'scale');
+if ($scaleOpt !== null && !ctype_digit($scaleOpt)) {
+    fail('--scale harus berupa bilangan bulat positif.', 2);
+}
+
+try {
+    $dynamic = QrisConverter::toDynamic($qris, $amount, [
+        'amountFormat' => opt($opts, 'format') ?? QrisConverter::FORMAT_AUTO,
+        'verifyCrc' => !flag($opts, 'no-verify-crc'),
+        'allowDynamicInput' => flag($opts, 'allow-dynamic'),
+    ]);
+
+    $pngPath = opt($opts, 'o', 'png');
+    if ($pngPath !== null) {
+        $png = PngRenderer::fromText(
+            $dynamic,
+            opt($opts, 'ecc') ?? 'M',
+            $scaleOpt !== null ? (int) $scaleOpt : 8
+        );
+        if (@file_put_contents($pngPath, $png) === false) {
+            fail("Gagal menulis PNG ke \"{$pngPath}\".");
+        }
+        fwrite(STDERR, "PNG disimpan: {$pngPath}\n");
+    }
+
+    echo $dynamic, "\n";
+} catch (QrisException $e) {
+    fail($e->getMessage());
+}

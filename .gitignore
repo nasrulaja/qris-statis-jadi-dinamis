@@ -1,0 +1,13 @@
+vendor/
+*.png
+qris-statis*.txt
+.env
+
+# Database panel & file sementara
+data/
+*.sqlite
+
+# Gambar QRIS asli merchant: JANGAN di-commit.
+# Isinya NMID + nama merchant; kalau bocor bisa dipakai untuk QRIS palsu.
+qris-statis.png
+
